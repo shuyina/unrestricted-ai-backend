@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    container_name: ai-api
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - ./storage:/app/storage
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      DATABASE_URL: "postgresql://aiuser:aipass@postgres:5432/aidb"
+      REDIS_URL: "redis://redis:6379/0"
+
+  worker:
+    build: .
+    container_name: ai-worker
+    command: celery -A src.workers.celery_app worker --loglevel=info -c 1
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      DATABASE_URL: "postgresql://aiuser:aipass@postgres:5432/aidb"
+      REDIS_URL: "redis://redis:6379/0"
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-redis
+    ports:
+      - "6379:6379"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-postgres
+    environment:
+      POSTGRES_USER: aiuser
+      POSTGRES_PASSWORD: aipass
+      POSTGRES_DB: aidb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
